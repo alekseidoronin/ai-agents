@@ -1,30 +1,28 @@
-import openai
-from anthropic import Anthropic
-from app.config import settings
+from app.agents import ContentPlanAgent, SalesFunnelAgent, AnalyticsAgent
+
 
 class AIService:
+    """Facade over all AI agents for use in routers and Telegram bot."""
+
     def __init__(self):
-        self.openai = openai.AsyncOpenAI(api_key=settings.openai_api_key)
-        self.anthropic = Anthropic(api_key=settings.anthropic_api_key)
+        self.content_plan_agent = ContentPlanAgent()
+        self.sales_funnel_agent = SalesFunnelAgent()
+        self.analytics_agent = AnalyticsAgent()
 
-    async def generate_content_plan(self, product: str, audience: str) -> list:
-        prompt = self._load_prompt("content_plan.txt")
+    async def generate_content_plan(self, product: str, audience: str) -> dict:
+        return await self.content_plan_agent.execute(product=product, audience=audience)
 
-        response = await self.openai.chat.completions.create(
-            model="gpt-4-turbo-preview",
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": f"Продукт: {product}\nЦА: {audience}"}
-            ],
-            temperature=0.7
+    async def generate_sales_funnel(
+        self,
+        product: str,
+        audience: str,
+        funnel_type: str = "standard",
+    ) -> dict:
+        return await self.sales_funnel_agent.execute(
+            product=product, audience=audience, funnel_type=funnel_type
         )
 
-        return self._parse_topics(response.choices[0].message.content)
-
-    def _load_prompt(self, filename: str) -> str:
-        with open(f"app/prompts/{filename}", "r") as f:
-            return f.read()
-
-    def _parse_topics(self, text: str) -> list:
-        # Парсинг ответа AI
-        return [line.strip("- ") for line in text.split("\n") if line.strip().startswith("-")]
+    async def run_analytics(self, data_description: str, goal: str) -> dict:
+        return await self.analytics_agent.execute(
+            data_description=data_description, goal=goal
+        )
